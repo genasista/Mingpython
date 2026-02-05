@@ -1,0 +1,36 @@
+services:
+  python-service:
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+      PORT: 8001
+      # Groq Configuration (snabb, gratis tier)
+      # För att använda Groq: Sätt GROQ_API_KEY miljövariabel
+      # Registrera dig på https://console.groq.com för att få API-nyckel
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://api.groq.com/openai/v1}
+      LLM_MODEL: ${LLM_MODEL:-llama-3.3-70b-versatile}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-60}
+      OPENAI_API_KEY: ${GROQ_API_KEY:-}
+    logging:
+      driver: loki
+      options:
+        loki-url: http://loki:3100/loki/api/v1/push
+        loki-external-labels: service=Genassista-EDU-pythonAPI,stack=dev
+
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+    networks: [backend]
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    ports:
+      - "3002:3000"
+    networks: [backend]
+    restart: unless-stopped
+
+networks:
+  backend:
+    external: false
+

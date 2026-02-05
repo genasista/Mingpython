@@ -1,0 +1,79 @@
+name: genassista-python
+
+x-python-env: &python-env
+  PYTHON_API_KEY: ${PYTHON_API_KEY:-CHANGE-ME-IN-PRODUCTION}
+  # Groq eller OpenAI API key (Groq använder OpenAI-kompatibelt API)
+  # För Groq: Sätt GROQ_API_KEY miljövariabel
+  # För OpenAI: Sätt OPENAI_API_KEY miljövariabel
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  CORE_BASE_URL: ${CORE_BASE_URL:-http://localhost:3001}
+  STORAGE_PROVIDER: ${STORAGE_PROVIDER:-local}
+  ENABLE_SUBSCRIBER: ${ENABLE_SUBSCRIBER:-false}
+  AMQP_URL: ${AMQP_URL:-amqp://guest:guest@rabbit:5672/}
+  EVENT_SUBMISSION_CREATED: ${EVENT_SUBMISSION_CREATED:-submission.created}
+  SUBSCRIBER_EXCHANGE: ${SUBSCRIBER_EXCHANGE:-events}
+  SUBSCRIBER_QUEUE: ${SUBSCRIBER_QUEUE:-submission.created}
+  SANDBOX_MODE: ${SANDBOX_MODE:-true}
+  API_KEY: ${API_KEY}
+  ADMIN_TOKEN: ${ADMIN_TOKEN}
+  X_DATA_MODE: sandbox
+
+services:
+  rabbit:
+    image: rabbitmq:3.13-management-alpine
+    container_name: genassista_rabbit
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - rabbit_data:/var/lib/rabbitmq
+    restart: unless-stopped
+
+  python-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    env_file:
+      - .env
+    environment:
+      <<: *python-env
+      PORT: ${PORT:-8001}
+    depends_on:
+      rabbit:
+        condition: service_healthy
+    # Make RabbitMQ optional for local development
+    environment:
+      ENABLE_SUBSCRIBER: ${ENABLE_SUBSCRIBER:-false}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python - <<'PY'\nimport os,urllib.request,sys; port=os.getenv('PORT','8001'); sys.exit(0 if urllib.request.urlopen(f'http://localhost:{port}/api/version1/health').getcode()==200 else 1)\nPY",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    ports:
+      - "8001:8001"
+    volumes:
+      - python_data:/app/data
+    networks: [backend]
+    restart: unless-stopped
+
+networks:
+  backend: {}
+
+volumes:
+  rabbit_data:
+  python_data:

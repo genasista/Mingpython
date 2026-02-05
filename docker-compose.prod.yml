@@ -1,0 +1,42 @@
+services:
+  python-service:
+    env_file: []  # prod values injected via secrets/CI env files
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    secrets:
+      - python_api_key
+      - groq_api_key
+      - openai_api_key
+      - admin_token
+      - legacy_api_key
+    ports: []      # rely on upstream load balancer
+    expose:
+      - "8001"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+  rabbit:
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+
+secrets:
+  python_api_key:
+    file: ./secrets/python_api_key
+  groq_api_key:
+    file: ./secrets/groq_api_key
+  openai_api_key:
+    file: ./secrets/openai_api_key
+  admin_token:
+    file: ./secrets/admin_token
+  legacy_api_key:
+    file: ./secrets/api_key
+
